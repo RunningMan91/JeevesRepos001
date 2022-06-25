@@ -220,8 +220,36 @@ def validate_hotel(slots):
     if room_type and not isvalid_room_type(room_type):
         return build_validation_result(False, 'RoomType', 'I did not recognize that room type.  Would you like to stay in a queen, king, or deluxe room?')
 
+    if view_preference and not isvalid_view_preference(view_preference):
+        return build_validation_result(
+            False,
+            'ViewPreference',
+            'I did not recognize your room view preference.  Would you like to stay in room with a view, no view, or either?'
+        )
+    
     return {'isValid': True}
 
+
+def validate_flight(slots):
+    au_departing = try_ex(lambda: slots['AU_Departing'])
+    au_destination = try_ex(lambda: slots['AU_Destination'])
+    flight_date = try_ex(lambda: slots['FlightDate'])
+    departure_time = try_ex(lambda: slots['DepartureTime'])
+    cabin_class = try_ex(lambda: slots['CabinClass'])
+    
+    if au_departing and not isvalid_city(au_departing):
+        return build_validation_result(
+            False,
+            'AU_Departing',
+            'We currently do not support {} as a valid departure location.  Can you try a different city?'.format(au_departing)
+        )
+    
+    if au_destination and not isvalid_city(au_destination):
+        return build_validation_result(
+            False,
+            'AU_Destination',
+            'We currently do not support {} as a valid destination.  Can you try a different city?'.format(au_departing)
+        )
 
 
 # --- Main handler sample code to edit---
@@ -231,7 +259,7 @@ def lambda_handler(event, context):
     The JSON body of the request is provided in the event slot.
     """
     # By default, treat the user request as coming from the America/New_York time zone.
-    os.environ['TZ'] = 'America/New_York'
+    os.environ['TZ'] = 'Australia/Sydney'
     time.tzset()
     logger.debug('event.bot.name={}'.format(event['bot']['name']))
 
