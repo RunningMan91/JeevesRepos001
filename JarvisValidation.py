@@ -300,8 +300,8 @@ def book_hotel(intent_request):
         'AU_Location': au_location,
         'RoomType': room_type,
         'CheckInDate': checkin_date,
-        'Nights': nights
-        'ViewPreference': view_preference,
+        'Nights': nights,
+        'ViewPreference' : view_preference
     })
 
     session_attributes['currentReservation'] = reservation
