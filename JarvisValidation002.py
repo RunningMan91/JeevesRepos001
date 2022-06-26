@@ -320,18 +320,16 @@ def book_hotel(intent_request):
         return delegate(session_attributes, intent_request['currentIntent']['slots'])
 
     # Booking the hotel.  In a real application, this would likely involve a call to a backend service.
-    logger.debug('bookHotel under={}'.format(reservation))
-
-    try_ex(lambda: session_attributes.pop('currentReservation'))
+    logger.debug('bookHotel at={}'.format(reservation))
+    del session_attributes['currentReservation']
     session_attributes['lastConfirmedReservation'] = reservation
-
+    
     return close(
         session_attributes,
         'Fulfilled',
         {
             'contentType': 'PlainText',
-            'content': 'Thanks, I have placed your reservation.   Please let me know if you would like to book a car '
-                       'rental, flight, or another hotel.'
+            'content': 'Thanks, I have placed your reservation.'
         }
     )
 
@@ -407,11 +405,69 @@ def book_flight(intent_request):
             return delegate(session_attributes, intent_request['currentIntent']['slots'])
 
         if confirmation_status == 'None':
+            # If we are currently auto-populating but have not gotten confirmation, keep requesting for confirmation.
+            if (not au_departing and not au_destination and not flight_date and not departure_time and not cabin_class)\
+                    or confirmation_context == 'AutoPopulate':
+                if last_confirmed_reservation and try_ex(lambda: last_confirmed_reservation['ReservationType']) == 'Hotel':
+                    # If the user's previous reservation was a hotel - prompt for a rental with
+                    # auto-populated values to match this reservation.
+                    session_attributes['confirmationContext'] = 'AutoPopulate'
+                    return confirm_intent(
+                        session_attributes,
+                        intent_request['currentIntent']['name'],
+                        {
+                            'AU_Destination': last_confirmed_reservation['AU_Location'],
+                            'FlightDate': last_confirmed_reservation['CheckInDate'],
+                            'AU_Departing': None,
+                            'DepartureTime': None,
+                            'CabinClass': None
+                        },
+                        {
+                            'contentType': 'PlainText',
+                            'content': 'Is this flight for your {} night stay in {} on {}?'.format(
+                                last_confirmed_reservation['Nights'],
+                                last_confirmed_reservation['AU_Location'],
+                                last_confirmed_reservation['CheckInDate']
+                            )
+                        }
+                    )
+              
+
             # Otherwise, let native DM rules determine how to elicit for slots and/or drive confirmation.
             return delegate(session_attributes, intent_request['currentIntent']['slots'])
 
+        # If confirmation has occurred, continue filling any unfilled slot values or pass to fulfillment.
+        if confirmation_status == 'Confirmed':
+            # Remove confirmationContext from sessionAttributes so it does not confuse future requests
+            try_ex(lambda: session_attributes.pop('confirmationContext'))
+            if confirmation_context == 'AutoPopulate':
+                if not departure_time:
+                    return elicit_slot(
+                        session_attributes,
+                        intent_request['currentIntent']['name'],
+                        intent_request['currentIntent']['slots'],
+                        'DepartureTime',
+                        {
+                            'contentType': 'PlainText',
+                            'content': 'What time do you want to depart? I can give you a morning or afternoon flight.'
+                        }
+                    )
+                elif not cabin_class:
+                    return elicit_slot(
+                        session_attributes,
+                        intent_request['currentIntent']['name'],
+                        intent_request['currentIntent']['slots'],
+                        'CabinClass',
+                        {
+                            'contentType': 'PlainText',
+                            'content': 'Which cabin class would you like? I have economy, business, and first class options.'
+                        }
+                    )
+
+            return delegate(session_attributes, intent_request['currentIntent']['slots'])
+
     # Booking the car.  In a real application, this would likely involve a call to a backend service.
-    logger.debug('bookCar at={}'.format(reservation))
+    logger.debug('bookFlight at={}'.format(reservation))
     del session_attributes['currentReservation']
     session_attributes['lastConfirmedReservation'] = reservation
     return close(
@@ -422,7 +478,6 @@ def book_flight(intent_request):
             'content': 'Thanks, I have placed your reservation.'
         }
     )
-
 
 def book_car(intent_request):
     """
